@@ -102,8 +102,8 @@ int main(int argc, char* argv[])
 		return 1;
 	}
 	// Load the image
-	int width, height, components_per_pixel = 3;
-	unsigned char* data = stbi_load(settings.source, &width, &height, &components_per_pixel, components_per_pixel);
+	int width, height, components_per_pixel = 4;
+	float* data = stbi_loadf(settings.source, &width, &height, &components_per_pixel, components_per_pixel);
 
 	try
 	{
@@ -118,10 +118,10 @@ int main(int argc, char* argv[])
 		cl::Buffer mask(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (maskRadius * 2 + 1) * (maskRadius * 2 + 1) * sizeof(float), convolve);
 
 		// Copy the image onto the device
-		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_R, CL_FLOAT), width, height, 0, (void*)data);
+		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void*)data);
 
 		// Create an output image on the device
-		cl::Image2D dst(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_R, CL_FLOAT), width, height, 0, nullptr);
+		cl::Image2D dst(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, nullptr);
 
 		// Prepare the kernel
 		cl_int err = 0;
