@@ -36,17 +36,24 @@ cl::Program BuildProgramFromSource(cl::Context &context, const std::string &file
 	cl::Program::Sources sources(1, std::make_pair(src.c_str(), src.length() + 1));
 	cl::Program program(context, sources);
 
-	err = program.build("-cl-std=CL1.2");
-	if (err == CL_BUILD_PROGRAM_FAILURE)
+	try
 	{
-		auto devices = context.getInfo<CL_CONTEXT_DEVICES>();
-		for (const cl::Device& device : devices)
+		program.build("-cl-std=CL1.2");
+	}
+	catch (cl::Error error)
+	{
+		if (error.err() == CL_BUILD_PROGRAM_FAILURE)
 		{
-			if (program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(device) != CL_BUILD_ERROR) { continue; }
-			std::string name = device.getInfo<CL_DEVICE_NAME>();
-			std::string log = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
-			std::cerr << "Build log for " << name << " : " << log << std::endl;
+			auto devices = context.getInfo<CL_CONTEXT_DEVICES>();
+			for (const cl::Device& device : devices)
+			{
+				if (program.getBuildInfo<CL_PROGRAM_BUILD_STATUS>(device) != CL_BUILD_ERROR) { continue; }
+				std::string name = device.getInfo<CL_DEVICE_NAME>();
+				std::string log = program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(device);
+				std::cerr << "Build log for " << name << " : " << log << std::endl;
+			}
 		}
+		throw error;
 	}
 	return program;
 }
@@ -132,12 +139,14 @@ int main(int argc, char* argv[])
 		kernel.setArg<int>(2, maskRadius);
 		kernel.setArg<cl::Image>(3, dst);
 
-		// Run the convolve kernel
+		// Run the convolve kernel, wait for it to finish (TODO: use events)
 		cl::CommandQueue queue(context, device, 0);
 		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height));
+		cl::finish();
 
 		// Read the image back onto the host
-		float* outData = new float[width * height * components_per_pixel];
+		int numElements = width * height * components_per_pixel;
+		float* outData = new float[numElements];
 		cl::size_t<3> origin;
 		// TODO: There's got to be a nicer way to construct this.
 		cl::size_t<3> region;
@@ -146,8 +155,18 @@ int main(int argc, char* argv[])
 		region[2] = 1;
 		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)outData);
 
+		// Seems to alternate between enqueueReadImage raising an exception (without any code changes above this line)
+		// and stbi_write_png raising an exception OR new uint8_t[]; triggering a malloc criticalFailure
+
+		// Convert float image to unsigned char for use in stb
+		uint8_t* imgData = new uint8_t[numElements];
+		for (int i = 0; i < numElements; i++)
+		{
+			imgData[i] = static_cast<uint8_t>(outData[i] * 255);
+		}
+
 		// Output the image
-		stbi_write_png(settings.destination, width, height, components_per_pixel, outData, sizeof(float) * components_per_pixel);
+		stbi_write_png(settings.destination, width, height, components_per_pixel, imgData, width * components_per_pixel);
 		return 0;
 	}
 	catch (cl::Error error)
