@@ -10,6 +10,8 @@
 #include <string>
 #include <vector>
 
+const float PI = 3.14159265358979f;
+
 cl::Context CreateContext()
 {
 	std::vector<cl::Platform> platforms;
@@ -58,28 +60,21 @@ cl::Program BuildProgramFromSource(cl::Context &context, const std::string &file
 	return program;
 }
 
-// Copied from https://www.eriksmistad.no/gaussian-blur-using-opencl-and-the-built-in-images-textures/
-float* createBlurMask(float sigma, int * maskRadiusPointer)
+float* gaussianDistribution(float sigma, int radius)
 {
-	int maskRadius = (int)ceil(3.0f*sigma);
-	int maskSize = maskRadius * 2 + 1;
-	float * mask = new float[maskSize * maskSize];
+	int maskSize = radius * 2 + 1;
+	float* mask = new float[maskSize * maskSize];
 	float sum = 0.0f;
-	for (int a = -maskRadius; a < maskRadius + 1; a++)
+	for (int y = -radius; y < radius + 1; y++)
 	{
-		for (int b = -maskRadius; b < maskRadius + 1; b++)
+		for (int x = -radius; x < radius + 1; x++)
 		{
-			float temp = exp(-((float)(a*a + b * b) / (2 * sigma*sigma)));
-			sum += temp;
-			mask[a + maskRadius + (b + maskRadius)*maskSize] = temp;
+			float pow = (float)(y * y + x * x) / (2 * sigma * sigma);
+			float weight = exp(-pow) * (1.0f / (2 * PI * sigma * sigma));
+			mask[y + radius + (x + radius) * maskSize] = weight;
+			sum += weight;
 		}
 	}
-	// Normalize the mask
-	for (int i = 0; i < maskSize*maskSize; i++)
-		mask[i] = mask[i] / sum;
-
-	*maskRadiusPointer = maskRadius;
-
 	return mask;
 }
 
@@ -117,8 +112,8 @@ int main(int argc, char* argv[])
 		cl::Device &device = devices.front();
 
 		// Load a convolve kernel on the device
-		int maskRadius = 0;
-		float* convolve = createBlurMask(3.0f, &maskRadius);
+		int maskRadius = 3;
+		float* convolve = gaussianDistribution(2.0f, maskRadius);
 		cl::Buffer mask(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (maskRadius * 2 + 1) * (maskRadius * 2 + 1) * sizeof(float), convolve);
 		delete[] convolve;
 
@@ -157,10 +152,11 @@ int main(int argc, char* argv[])
 		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)data);
 
 		// Convert float image to unsigned char for use in stb
+		const float gamma = 1.0f / 2.2f;
 		unsigned char* imgData = new unsigned char[numElements];
 		for (int i = 0; i < numElements; i++)
 		{
-			imgData[i] = static_cast<unsigned char>(data[i] * 255);
+			imgData[i] = static_cast<unsigned char>(powf(data[i], gamma) * 255);
 		}
 
 		// Output the image
