@@ -14,5 +14,5 @@ __kernel void GaussianBlur(__read_only image2d_t src, __constant float *mask,
     }
   }
 
-  write_imagef(dst, pos, sum);
+  write_imagef(dst, pos, clamp(sum, 0.0f, 1.0f));
 }

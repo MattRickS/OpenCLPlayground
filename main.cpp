@@ -108,9 +108,6 @@ int main(int argc, char* argv[])
 	{
 		return 1;
 	}
-	// Load the image
-	int width, height, components_per_pixel = 4;
-	float* data = stbi_loadf(settings.source, &width, &height, &components_per_pixel, components_per_pixel);
 
 	try
 	{
@@ -119,13 +116,17 @@ int main(int argc, char* argv[])
 		auto devices = context.getInfo<CL_CONTEXT_DEVICES>();
 		cl::Device &device = devices.front();
 
-		// Prepare the convolve kernel
+		// Load a convolve kernel on the device
 		int maskRadius = 0;
 		float* convolve = createBlurMask(3.0f, &maskRadius);
 		cl::Buffer mask(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (maskRadius * 2 + 1) * (maskRadius * 2 + 1) * sizeof(float), convolve);
+		delete[] convolve;
 
-		// Copy the image onto the device
+		// Load the image onto the device
+		int width, height, components_per_pixel = 4;
+		float* data = stbi_loadf(settings.source, &width, &height, &components_per_pixel, components_per_pixel);
 		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void*)data);
+		delete[] data;
 
 		// Create an output image on the device
 		cl::Image2D dst(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, nullptr);
@@ -144,25 +145,22 @@ int main(int argc, char* argv[])
 		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height));
 		cl::finish();
 
-		// Read the image back onto the host
-		int numElements = width * height * components_per_pixel;
-		float* outData = new float[numElements];
+		// Read the image back onto the host. Whatever the source image components, the kernel returns a float4 image
 		cl::size_t<3> origin;
-		// TODO: There's got to be a nicer way to construct this.
 		cl::size_t<3> region;
 		region[0] = width;
 		region[1] = height;
 		region[2] = 1;
-		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)outData);
-
-		// Seems to alternate between enqueueReadImage raising an exception (without any code changes above this line)
-		// and stbi_write_png raising an exception OR new uint8_t[]; triggering a malloc criticalFailure
+		components_per_pixel = 4;
+		int numElements = width * height * components_per_pixel;
+		data = new float[numElements];
+		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)data);
 
 		// Convert float image to unsigned char for use in stb
-		uint8_t* imgData = new uint8_t[numElements];
+		unsigned char* imgData = new unsigned char[numElements];
 		for (int i = 0; i < numElements; i++)
 		{
-			imgData[i] = static_cast<uint8_t>(outData[i] * 255);
+			imgData[i] = static_cast<unsigned char>(data[i] * 255);
 		}
 
 		// Output the image
