@@ -119,9 +119,9 @@ int main(int argc, char* argv[])
 
 		// Load the image onto the device
 		int width, height, components_per_pixel = 4;
-		float* data = stbi_loadf(settings.source, &width, &height, &components_per_pixel, components_per_pixel);
-		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void*)data);
-		delete[] data;
+		float* srcData = stbi_loadf(settings.source, &width, &height, &components_per_pixel, components_per_pixel);
+		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void*)srcData);
+		delete[] srcData;
 
 		// Create an output image on the device
 		cl::Image2D dst(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, nullptr);
@@ -148,19 +148,22 @@ int main(int argc, char* argv[])
 		region[2] = 1;
 		components_per_pixel = 4;
 		int numElements = width * height * components_per_pixel;
-		data = new float[numElements];
-		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)data);
+		float* dstData = new float[numElements];
+		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)dstData);
 
 		// Convert float image to unsigned char for use in stb
 		const float gamma = 1.0f / 2.2f;
-		unsigned char* imgData = new unsigned char[numElements];
+		unsigned char* outData = new unsigned char[numElements];
 		for (int i = 0; i < numElements; i++)
 		{
-			imgData[i] = static_cast<unsigned char>(powf(data[i], gamma) * 255);
+			outData[i] = static_cast<unsigned char>(powf(dstData[i], gamma) * 255);
 		}
+		delete[] dstData;
 
 		// Output the image
-		stbi_write_png(settings.destination, width, height, components_per_pixel, imgData, width * components_per_pixel);
+		stbi_write_png(settings.destination, width, height, components_per_pixel, outData, width * components_per_pixel);
+		delete[] outData;
+
 		return 0;
 	}
 	catch (cl::Error error)
