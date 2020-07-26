@@ -82,24 +82,32 @@ struct Settings
 {
 	char* source;
 	char* destination;
+	float strength = 3.0f;
+	int radius = 5;
 	float gamma = 1.0f;
 	float gammaInv = 1.0f;
 };
 
 bool parse(int argc, char* argv[], Settings &settings)
 {
-	if (argc < 3 || argc > 4)
+	if (argc < 3 || argc > 6)
 	{
-		std::cerr << "Usage: " << argv[0] << " SOURCE DESTINATION [GAMMA]" << std::endl;
+		std::cerr << "Usage: " << argv[0] << " SOURCE DESTINATION [RADIUS] [STRENGTH] [GAMMA]" << std::endl;
 		return false;
 	}
-	settings.source = argv[1];
-	settings.destination = argv[2];
 
-	if (argc > 3)
+	switch (argc)
 	{
-		settings.gamma = std::stof(argv[3]);
+	case 6:
+		settings.gamma = std::stof(argv[5]);
 		settings.gammaInv = 1.0f / settings.gamma;
+	case 5:
+		settings.strength = std::stof(argv[4]);
+	case 4:
+		settings.radius = std::stoi(argv[3]);
+	default:
+		settings.source = argv[1];
+		settings.destination = argv[2];
 	}
 
 	return true;
@@ -122,13 +130,17 @@ int main(int argc, char* argv[])
 
 		// Load a convolve kernel on the device
 		int maskRadius = 3;
-		float* convolve = gaussianDistribution(2.0f, maskRadius);
-		cl::Buffer mask(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (maskRadius * 2 + 1) * (maskRadius * 2 + 1) * sizeof(float), convolve);
+		float* convolve = gaussianDistribution(settings.strength, settings.radius);
+		cl::Buffer mask(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (settings.radius * 2 + 1) * (settings.radius * 2 + 1) * sizeof(float), convolve);
 		delete[] convolve;
 
 		// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
 		int width, height, components, components_per_pixel = 4;
 		unsigned char* inData = stbi_load(settings.source, &width, &height, &components, components_per_pixel);
+		if (inData == nullptr)
+		{
+			throw std::runtime_error("Failed to load source image");
+		}
 		int numElements = width * height * components_per_pixel;
 		float* srcData = new float[numElements];
 		for (int i = 0; i < numElements; i++)
@@ -148,7 +160,7 @@ int main(int argc, char* argv[])
 		cl::Kernel kernel(program, "GaussianBlur");
 		kernel.setArg<cl::Image>(0, src);
 		kernel.setArg<cl::Buffer>(1, mask);
-		kernel.setArg<int>(2, maskRadius);
+		kernel.setArg<int>(2, settings.radius);
 		kernel.setArg<cl::Image>(3, dst);
 
 		// Run the convolve kernel, wait for it to finish (TODO: use events)
