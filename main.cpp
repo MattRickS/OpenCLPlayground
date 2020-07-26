@@ -82,17 +82,26 @@ struct Settings
 {
 	char* source;
 	char* destination;
+	float gamma = 1.0f;
+	float gammaInv = 1.0f;
 };
 
 bool parse(int argc, char* argv[], Settings &settings)
 {
-	if (argc != 3)
+	if (argc < 3 || argc > 4)
 	{
-		std::cerr << "Usage: " << argv[0] << " SOURCE DESTINATION" << std::endl;
+		std::cerr << "Usage: " << argv[0] << " SOURCE DESTINATION [GAMMA]" << std::endl;
 		return false;
 	}
 	settings.source = argv[1];
 	settings.destination = argv[2];
+
+	if (argc > 3)
+	{
+		settings.gamma = std::stof(argv[3]);
+		settings.gammaInv = 1.0f / settings.gamma;
+	}
+
 	return true;
 }
 
@@ -117,9 +126,16 @@ int main(int argc, char* argv[])
 		cl::Buffer mask(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (maskRadius * 2 + 1) * (maskRadius * 2 + 1) * sizeof(float), convolve);
 		delete[] convolve;
 
-		// Load the image onto the device
-		int width, height, components_per_pixel = 4;
-		float* srcData = stbi_loadf(settings.source, &width, &height, &components_per_pixel, components_per_pixel);
+		// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
+		int width, height, components, components_per_pixel = 4;
+		unsigned char* inData = stbi_load(settings.source, &width, &height, &components, components_per_pixel);
+		int numElements = width * height * components_per_pixel;
+		float* srcData = new float[numElements];
+		for (int i = 0; i < numElements; i++)
+		{
+			srcData[i] = powf(inData[i] / 255.0f, settings.gamma);
+		}
+		delete[] inData;
 		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void*)srcData);
 		delete[] srcData;
 
@@ -146,17 +162,22 @@ int main(int argc, char* argv[])
 		region[0] = width;
 		region[1] = height;
 		region[2] = 1;
-		components_per_pixel = 4;
-		int numElements = width * height * components_per_pixel;
 		float* dstData = new float[numElements];
 		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)dstData);
 
-		// Convert float image to unsigned char for use in stb
-		const float gamma = 1.0f / 2.2f;
+		// Convert float image to unsigned char for use in stb - explictly handle colorspace
 		unsigned char* outData = new unsigned char[numElements];
 		for (int i = 0; i < numElements; i++)
 		{
-			outData[i] = static_cast<unsigned char>(powf(dstData[i], gamma) * 255);
+			// If the source image did not provide an alpha, then output a constant full alpha
+			if (components != 4 && i % 4 == 3)
+			{
+				outData[i] = 255;
+			}
+			else
+			{
+				outData[i] = static_cast<unsigned char>(powf(dstData[i], settings.gammaInv) * 255);
+			}
 		}
 		delete[] dstData;
 
