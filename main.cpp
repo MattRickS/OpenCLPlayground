@@ -8,25 +8,21 @@
 
 #include <iostream>
 
-
-
-int main(int argc, char* argv[])
+int main(int argc, char *argv[])
 {
-	// TODO: Settings base class that Kernel operators can upcast to their own type. Has source, dest, and gamma that are parsed earlier
 	if (argc < 5)
 	{
 		std::cerr << "Usage: " << argv[0] << " SOURCE DESTINATION GAMMA KERNEL [SETTINGS]" << std::endl;
 		return 1;
 	}
 
-	char* source = argv[1];
-	char* destination = argv[2];
+	char *source = argv[1];
+	char *destination = argv[2];
 	float gamma = std::stof(argv[3]);
 	float gammaInv = 1.0f / gamma;
-	char* kernelName = argv[4];
+	char *kernelName = argv[4];
 
-	// TODO: Base class that all inherit from and a mapping for looking up the Kernel operator
-	// TODO: string comparison
+	// TODO: Mapping for looking up the Kernel operator
 	if (kernelName != GaussianBlur::name)
 	{
 		std::cerr << "Unknown kernel: " << argv[1] << std::endl;
@@ -47,10 +43,11 @@ int main(int argc, char* argv[])
 		auto devices = context.getInfo<CL_CONTEXT_DEVICES>();
 		cl::Device &device = devices.front();
 
+		// TODO: Image creation is failing for some reason
 		// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
 		int width, height, components = 4;
-		float* srcData = ImageUtil::ReadImage(source, gamma, &width, &height, components);
-		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void*)srcData);
+		float *srcData = ImageUtil::ReadImage(source, gamma, &width, &height, components);
+		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void *)srcData);
 		delete[] srcData;
 
 		// Create an output image on the device
@@ -66,8 +63,8 @@ int main(int argc, char* argv[])
 		region[0] = width;
 		region[1] = height;
 		region[2] = 1;
-		float* dstData = new float[width * height * components];
-		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void*)dstData);
+		float *dstData = new float[width * height * components];
+		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void *)dstData);
 
 		// Output the image
 		ImageUtil::WriteImage(destination, dstData, width, height, components, gammaInv);

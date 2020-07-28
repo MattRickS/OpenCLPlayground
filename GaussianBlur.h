@@ -8,6 +8,7 @@
 class GaussianBlur : public Op::Operator
 {
 public:
+	static const std::string name;
 	float strength{ 3.0f };
 	int radius{ 5 };
 

@@ -71,8 +71,8 @@ void GaussianBlur::Execute(cl::Context &context, cl::CommandQueue& queue, cl::Im
 	kernel.setArg<cl::Image>(3, dst);
 
 	// Run the convolve kernel, wait for it to finish (TODO: use events)
-	int width = src.getImageInfo<CL_IMAGE_WIDTH>();
-	int height = src.getImageInfo<CL_IMAGE_HEIGHT>();
+	size_t width = src.getImageInfo<CL_IMAGE_WIDTH>();
+	size_t height = src.getImageInfo<CL_IMAGE_HEIGHT>();
 	queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height));
 	cl::finish();
 }
