@@ -11,7 +11,8 @@
 float* ImageUtil::ReadImage(char filepath[], float gamma, int* width, int* height, int components)
 {
 	// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
-	unsigned char* inData = stbi_load(filepath, width, height, &components, components);
+	int returned_components = 0;
+	unsigned char* inData = stbi_load(filepath, width, height, &returned_components, components);
 	if (inData == nullptr)
 	{
 		throw std::runtime_error("Failed to load source image");
