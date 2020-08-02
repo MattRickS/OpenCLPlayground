@@ -3,17 +3,24 @@
 
 #include "Op.h"
 
+#include <memory>
 #include <string>
 
-class GaussianBlur : public Op::Operator
+namespace Op
 {
-public:
-	static const std::string name;
-	float strength{ 3.0f };
-	int radius{ 5 };
+	class GaussianBlur : public Op::Operator
+	{
+	public:
+		float strength{ 3.0f };
+		int radius{ 5 };
 
-	float* Distribution(float sigma, int radius) const;
-	bool Parse(int argc, char* argv[]) override;
-	void PrintUsage() const override;
-	void Execute(cl::Context &context, cl::CommandQueue& queue, cl::Image &src, cl::Image &dst) override;
-};
+		float* Distribution(float sigma, int radius) const;
+		bool Parse(int argc, char* argv[]) override;
+		void PrintUsage() const override;
+		void Execute(cl::Context &context, cl::CommandQueue& queue, cl::Image &src, cl::Image &dst) override;
+		static std::shared_ptr<GaussianBlur> Create()
+		{
+			return std::make_shared<GaussianBlur>();
+		};
+	};
+}

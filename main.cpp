@@ -22,17 +22,17 @@ int main(int argc, char *argv[])
 	float gammaInv = 1.0f / gamma;
 	char *kernelName = argv[4];
 
+	std::shared_ptr<Op::Operator> op = Op::Registry::Create(kernelName);
 	// TODO: Mapping for looking up the Kernel operator
-	if (kernelName != GaussianBlur::name)
+	if (op == nullptr)
 	{
 		std::cerr << "Unknown kernel: " << argv[1] << std::endl;
 		return 1;
 	}
 
-	GaussianBlur op;
-	if (!op.Parse(argc - 5, argv + 5))
+	if (!op->Parse(argc - 5, argv + 5))
 	{
-		op.PrintUsage();
+		op->PrintUsage();
 		return 1;
 	}
 
@@ -55,7 +55,7 @@ int main(int argc, char *argv[])
 
 		// Execute the op queue
 		cl::CommandQueue queue(context, device);
-		op.Execute(context, queue, src, dst);
+		op->Execute(context, queue, src, dst);
 
 		// Read the image back onto the host. Whatever the source image components, the kernel returns a float4 image
 		cl::size_t<3> origin;
