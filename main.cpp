@@ -12,7 +12,7 @@ int main(int argc, char *argv[])
 {
 	if (argc < 5)
 	{
-		std::cerr << "Usage: " << argv[0] << " SOURCE DESTINATION GAMMA KERNEL [SETTINGS]" << std::endl;
+		std::cerr << "Usage: " << argv[0] << " SOURCE DESTINATION GAMMA KERNEL [SETTINGS] [-- KERNEL [SETTINGS] ...]" << std::endl;
 		return 1;
 	}
 
@@ -53,7 +53,6 @@ int main(int argc, char *argv[])
 		auto devices = context.getInfo<CL_CONTEXT_DEVICES>();
 		cl::Device &device = devices.front();
 
-		// TODO: Image creation is failing for some reason
 		// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
 		int width, height, src_components, components = 4;
 		float *srcData = ImageUtil::ReadImage(source, gamma, &width, &height, &src_components, components);
