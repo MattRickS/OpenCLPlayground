@@ -8,6 +8,36 @@
 
 #include <iostream>
 
+using OpList = std::vector<std::shared_ptr<Op::Operator>>;
+
+OpList ParseOperators(int argc, char* argv[], int start)
+{
+	static const std::string sep("--");
+	OpList operators;
+	for (int i = start; i <= argc; i++)
+	{
+		if (i == argc || argv[i] == sep)
+		{
+			char *kernelName = argv[start];
+			std::shared_ptr<Op::Operator> op = Op::Registry::Create(kernelName);
+			if (op == nullptr)
+			{
+				std::cerr << "Unknown kernel: " << kernelName << std::endl;
+				return OpList();
+			}
+			if (!op->Parse(i - start - 1, argv + start + 1))
+			{
+				op->PrintUsage();
+				return OpList();
+			}
+			operators.push_back(op);
+			start = ++i;
+		}
+	}
+
+	return operators;
+}
+
 int main(int argc, char *argv[])
 {
 	if (argc < 5)
@@ -22,28 +52,10 @@ int main(int argc, char *argv[])
 	float gammaInv = 1.0f / gamma;
 
 	// Parse all operators and their settings
-	std::vector<std::shared_ptr<Op::Operator>> operators;
-	int start = 4;
-	const std::string sep("--");
-	for (int i = start; i <= argc; i++)
+	OpList operators = ParseOperators(argc, argv, 4);
+	if (operators.empty())
 	{
-		if (i == argc || argv[i] == sep)
-		{
-			char *kernelName = argv[start];
-			std::shared_ptr<Op::Operator> op = Op::Registry::Create(kernelName);
-			if (op == nullptr)
-			{
-				std::cerr << "Unknown kernel: " << kernelName << std::endl;
-				return 1;
-			}
-			if (!op->Parse(i - start - 1, argv + start + 1))
-			{
-				op->PrintUsage();
-				return 1;
-			}
-			operators.push_back(op);
-			start = ++i;
-		}
+		return 1;
 	}
 
 	try
