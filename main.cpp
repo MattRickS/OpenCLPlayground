@@ -45,8 +45,8 @@ int main(int argc, char *argv[])
 
 		// TODO: Image creation is failing for some reason
 		// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
-		int width, height, components = 4;
-		float *srcData = ImageUtil::ReadImage(source, gamma, &width, &height, components);
+		int width, height, src_components, components = 4;
+		float *srcData = ImageUtil::ReadImage(source, gamma, &width, &height, &src_components, components);
 		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void *)srcData);
 		delete[] srcData;
 
@@ -66,8 +66,8 @@ int main(int argc, char *argv[])
 		float *dstData = new float[width * height * components];
 		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void *)dstData);
 
-		// Output the image
-		ImageUtil::WriteImage(destination, dstData, width, height, components, gammaInv);
+		// Output the image - fill the alpha unless the source imaged had an alpha to be modified
+		ImageUtil::WriteImage(destination, dstData, width, height, components, gammaInv, src_components != 4);
 		delete[] dstData;
 
 		return 0;

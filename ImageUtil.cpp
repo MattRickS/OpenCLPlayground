@@ -8,11 +8,10 @@
 #include <stdexcept>
 
 
-float* ImageUtil::ReadImage(char filepath[], float gamma, int* width, int* height, int components)
+float* ImageUtil::ReadImage(char filepath[], float gamma, int* width, int* height, int* returned_components, int components)
 {
 	// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
-	int returned_components = 0;
-	unsigned char* inData = stbi_load(filepath, width, height, &returned_components, components);
+	unsigned char* inData = stbi_load(filepath, width, height, returned_components, components);
 	if (inData == nullptr)
 	{
 		throw std::runtime_error("Failed to load source image");
@@ -28,7 +27,7 @@ float* ImageUtil::ReadImage(char filepath[], float gamma, int* width, int* heigh
 	return srcData;
 }
 
-void ImageUtil::WriteImage(char filepath[], float* imgData, int width, int height, int components, float gamma)
+void ImageUtil::WriteImage(char filepath[], float* imgData, int width, int height, int components, float gamma, bool fill_alpha)
 {
 	// Convert float image to unsigned char for use in stb - explictly handle colorspace
 	int numElements = width * height * components;
@@ -36,7 +35,7 @@ void ImageUtil::WriteImage(char filepath[], float* imgData, int width, int heigh
 	for (int i = 0; i < numElements; i++)
 	{
 		// If the source image did not provide an alpha, then output a constant full alpha
-		if (components != 4 && i % 4 == 3)
+		if (fill_alpha && i % 4 == 3)
 		{
 			outData[i] = 255;
 		}

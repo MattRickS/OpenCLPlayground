@@ -8,7 +8,7 @@
 
 namespace Op
 {
-	class GaussianBlur : public Op::Operator
+	class GaussianBlur : public Operator
 	{
 	public:
 		float strength{ 3.0f };
