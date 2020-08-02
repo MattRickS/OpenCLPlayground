@@ -20,20 +20,30 @@ int main(int argc, char *argv[])
 	char *destination = argv[2];
 	float gamma = std::stof(argv[3]);
 	float gammaInv = 1.0f / gamma;
-	char *kernelName = argv[4];
 
-	std::shared_ptr<Op::Operator> op = Op::Registry::Create(kernelName);
-	// TODO: Mapping for looking up the Kernel operator
-	if (op == nullptr)
+	// Parse all operators and their settings
+	std::vector<std::shared_ptr<Op::Operator>> operators;
+	int start = 4;
+	const std::string sep("--");
+	for (int i = start; i <= argc; i++)
 	{
-		std::cerr << "Unknown kernel: " << argv[1] << std::endl;
-		return 1;
-	}
-
-	if (!op->Parse(argc - 5, argv + 5))
-	{
-		op->PrintUsage();
-		return 1;
+		if (i == argc || argv[i] == sep)
+		{
+			char *kernelName = argv[start];
+			std::shared_ptr<Op::Operator> op = Op::Registry::Create(kernelName);
+			if (op == nullptr)
+			{
+				std::cerr << "Unknown kernel: " << kernelName << std::endl;
+				return 1;
+			}
+			if (!op->Parse(i - start - 1, argv + start + 1))
+			{
+				op->PrintUsage();
+				return 1;
+			}
+			operators.push_back(op);
+			start = ++i;
+		}
 	}
 
 	try
@@ -47,15 +57,24 @@ int main(int argc, char *argv[])
 		// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
 		int width, height, src_components, components = 4;
 		float *srcData = ImageUtil::ReadImage(source, gamma, &width, &height, &src_components, components);
-		cl::Image2D src(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void *)srcData);
+		cl::Image2D src(context, CL_MEM_READ_WRITE | CL_MEM_COPY_HOST_PTR, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, (void *)srcData);
 		delete[] srcData;
 
 		// Create an output image on the device
-		cl::Image2D dst(context, CL_MEM_WRITE_ONLY, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, nullptr);
+		cl::Image2D dst(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, nullptr);
 
-		// Execute the op queue
+		// Execute the op queue -- TODO: Operators should actually add to the queue and the whole queue executed once with events for waiting
 		cl::CommandQueue queue(context, device);
-		op->Execute(context, queue, src, dst);
+		cl::Image2D* from = &src;
+		cl::Image2D* to = &dst;
+		for (const auto& op : operators)
+		{
+			op->Execute(context, queue, *from, *to);
+			// Ping pong the images. Note, this leaves the "from" pointer as the final output
+			cl::Image2D* tmp = from;
+			from = to;
+			to = tmp;
+		}
 
 		// Read the image back onto the host. Whatever the source image components, the kernel returns a float4 image
 		cl::size_t<3> origin;
@@ -64,7 +83,7 @@ int main(int argc, char *argv[])
 		region[1] = height;
 		region[2] = 1;
 		float *dstData = new float[width * height * components];
-		queue.enqueueReadImage(dst, CL_TRUE, origin, region, 0, 0, (void *)dstData);
+		queue.enqueueReadImage(*from, CL_TRUE, origin, region, 0, 0, (void *)dstData);
 
 		// Output the image - fill the alpha unless the source imaged had an alpha to be modified
 		ImageUtil::WriteImage(destination, dstData, width, height, components, gammaInv, src_components != 4);
