@@ -6,6 +6,7 @@
 namespace CLUtil
 {
 	cl::Context CreateContext();
-	cl::Program BuildProgramFromSource(cl::Context &context, const std::string &file, cl_int &err);
+	cl::Program BuildProgramFromSource(cl::Context &context, const std::string &file);
+	cl::Program BuildProgramFromSources(cl::Context &context, cl::Program::Sources sources);
 };
 

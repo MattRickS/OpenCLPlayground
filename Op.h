@@ -15,9 +15,11 @@ namespace Op
 	public:
 		std::shared_ptr<cl::Image> outputImage;
 
+		virtual std::string Kernel() const = 0;
+		virtual std::string Name() const = 0;
 		virtual bool Parse(int argc, char* argv[]) = 0;
 		virtual void PrintUsage() const = 0;
-		virtual bool Execute(cl::Context &context, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image) = 0;
+		virtual bool Execute(cl::Program& program, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image) = 0;
 	};
 
 	using OpCreator = std::function<std::shared_ptr<Operator>()>;

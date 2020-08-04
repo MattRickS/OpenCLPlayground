@@ -6,6 +6,7 @@
 #include "ImageUtil.h"
 #include "Op.h"
 
+#include <algorithm>
 #include <iostream>
 
 using OpList = std::vector<std::shared_ptr<Op::Operator>>;
@@ -53,10 +54,29 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
+	// Gather kernels for program
+	std::vector<std::string> kernels;
+	for (const auto& op : operators)
+	{
+		std::string s = op->Kernel();
+		if (s != "")
+		{
+			kernels.emplace_back(s);
+		}
+	}
+
+	cl::Program::Sources sources;
+	for (const auto& s : kernels)
+	{
+		sources.push_back(std::make_pair(s.c_str(), s.length() + 1));
+	}
+
+
 	try
 	{
 		// Start a CL context
 		cl::Context context = CLUtil::CreateContext();
+		cl::Program program = CLUtil::BuildProgramFromSources(context, sources);
 		auto devices = context.getInfo<CL_CONTEXT_DEVICES>();
 		cl::Device &device = devices.front();
 
@@ -65,9 +85,9 @@ int main(int argc, char *argv[])
 		std::shared_ptr<cl::Image> current(nullptr);
 		for (const auto& op : operators)
 		{
-			if (!op->Execute(context, queue, current))
+			if (!op->Execute(program, queue, current))
 			{
-				throw std::runtime_error("Operator failed to execute");
+				throw std::runtime_error("Operator '" + op->Name() + "' failed to execute");
 			}
 			current = op->outputImage;
 		}

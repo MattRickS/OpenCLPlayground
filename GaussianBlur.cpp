@@ -4,6 +4,7 @@
 #include <CL/cl.hpp>
 
 #include <cmath>
+#include <fstream>
 #include <iostream>
 #include <string>
 
@@ -11,6 +12,12 @@ const float PI = 3.14159265358979f;
 
 namespace Op
 {
+	std::string GaussianBlur::Kernel() const
+	{
+		std::ifstream sourceFile("GaussianBlur.cl");
+		return std::string(std::istreambuf_iterator<char>(sourceFile), (std::istreambuf_iterator<char>()));
+	}
+
 	float* GaussianBlur::Distribution(float sigma, int radius) const
 	{
 		int maskSize = radius * 2 + 1;
@@ -54,12 +61,14 @@ namespace Op
 		return true;
 	}
 
-	bool GaussianBlur::Execute(cl::Context &context, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image)
+	bool GaussianBlur::Execute(cl::Program &program, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image)
 	{
 		if (image == nullptr)
 		{
 			throw std::runtime_error("GaussianBlur requires an input Image");
 		}
+
+		cl::Context context = program.getInfo<CL_PROGRAM_CONTEXT>();
 
 		// Load a convolve kernel on the device
 		float* convolve = Distribution(strength, radius);
@@ -71,9 +80,7 @@ namespace Op
 		outputImage = std::make_shared<cl::Image2D>(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, nullptr);
 
 		// Prepare the kernel
-		cl_int err = 0;
-		cl::Program program = CLUtil::BuildProgramFromSource(context, "GaussianBlur.cl", err);
-		cl::Kernel kernel(program, "GaussianBlur");
+		cl::Kernel kernel(program, Name().c_str());
 		kernel.setArg<cl::Image>(0, *image);
 		kernel.setArg<cl::Buffer>(1, mask);
 		kernel.setArg<int>(2, radius);

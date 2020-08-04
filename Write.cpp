@@ -31,7 +31,7 @@ namespace Op
 		std::cout << "Usage: Write FILEPATH [GAMMA]" << std::endl;
 	}
 
-	bool Write::Execute(cl::Context &context, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image)
+	bool Write::Execute(cl::Program& program, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image)
 	{
 		if (image == nullptr)
 		{

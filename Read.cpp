@@ -31,12 +31,15 @@ namespace Op
 		std::cout << "Usage: Read FILEPATH [GAMMA]" << std::endl;
 	}
 
-	bool Read::Execute(cl::Context &context, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image)
+	bool Read::Execute(cl::Program& program, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image)
 	{
 		if (image != nullptr)
 		{
 			throw std::runtime_error("Read does not take an input Image");
 		}
+
+		cl::Context context = program.getInfo<CL_PROGRAM_CONTEXT>();
+
 		// Load the image onto the device - explicitly handle colorspace ourselves instead of stbi_loadf
 		int width, height, src_components, components = 4;
 		float *srcData = ImageUtil::ReadImage(sourceFile, gamma, &width, &height, &src_components, components);
