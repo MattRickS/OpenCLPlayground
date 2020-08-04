@@ -42,15 +42,12 @@ int main(int argc, char *argv[])
 {
 	if (argc < 5)
 	{
-		std::cerr << "Usage: " << argv[0] << " DESTINATION GAMMA KERNEL [SETTINGS] [-- KERNEL [SETTINGS] ...]" << std::endl;
+		std::cerr << "Usage: " << argv[0] << " KERNEL [SETTINGS] [-- KERNEL [SETTINGS] ...]" << std::endl;
 		return 1;
 	}
 
-	char *destination = argv[1];
-	float gammaInv = 1.0f / std::stof(argv[2]);
-
 	// Parse all operators and their settings
-	OpList operators = ParseOperators(argc, argv, 3);
+	OpList operators = ParseOperators(argc, argv, 1);
 	if (operators.empty())
 	{
 		return 1;
@@ -74,25 +71,6 @@ int main(int argc, char *argv[])
 			}
 			current = op->outputImage;
 		}
-
-		int width = (int)current->getImageInfo<CL_IMAGE_WIDTH>();
-		int height = (int)current->getImageInfo<CL_IMAGE_HEIGHT>();
-		// TODO: Actually handle image formats rather than guessing
-		int components = 4;
-
-		// Read the image back onto the host. Whatever the source image components, the kernel returns a float4 image
-		cl::size_t<3> origin;
-		cl::size_t<3> region;
-		region[0] = width;
-		region[1] = height;
-		region[2] = 1;
-		float *dstData = new float[width * height * components];
-		queue.enqueueReadImage(*current, CL_TRUE, origin, region, 0, 0, (void *)dstData);
-
-		// Output the image - fill the alpha unless the source imaged had an alpha to be modified
-		// TODO: "fill alpha" shouldn't be an option, should just respect input
-		ImageUtil::WriteImage(destination, dstData, width, height, components, gammaInv, true);
-		delete[] dstData;
 
 		return 0;
 	}
