@@ -54,27 +54,36 @@ namespace Op
 		return true;
 	}
 
-	void GaussianBlur::Execute(cl::Context &context, cl::CommandQueue& queue, cl::Image &src, cl::Image &dst)
+	bool GaussianBlur::Execute(cl::Context &context, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image)
 	{
+		if (image == nullptr)
+		{
+			throw std::runtime_error("GaussianBlur requires an input Image");
+		}
+
 		// Load a convolve kernel on the device
 		float* convolve = Distribution(strength, radius);
 		cl::Buffer mask(context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, (radius * 2 + 1) * (radius * 2 + 1) * sizeof(float), convolve);
 		delete[] convolve;
 
+		size_t width = image->getImageInfo<CL_IMAGE_WIDTH>();
+		size_t height = image->getImageInfo<CL_IMAGE_HEIGHT>();
+		outputImage = std::make_shared<cl::Image2D>(context, CL_MEM_READ_WRITE, cl::ImageFormat(CL_RGBA, CL_FLOAT), width, height, 0, nullptr);
+
 		// Prepare the kernel
 		cl_int err = 0;
 		cl::Program program = CLUtil::BuildProgramFromSource(context, "GaussianBlur.cl", err);
 		cl::Kernel kernel(program, "GaussianBlur");
-		kernel.setArg<cl::Image>(0, src);
+		kernel.setArg<cl::Image>(0, *image);
 		kernel.setArg<cl::Buffer>(1, mask);
 		kernel.setArg<int>(2, radius);
-		kernel.setArg<cl::Image>(3, dst);
+		kernel.setArg<cl::Image>(3, *outputImage);
 
 		// Run the convolve kernel, wait for it to finish (TODO: use events)
-		size_t width = src.getImageInfo<CL_IMAGE_WIDTH>();
-		size_t height = src.getImageInfo<CL_IMAGE_HEIGHT>();
 		queue.enqueueNDRangeKernel(kernel, cl::NullRange, cl::NDRange(width, height));
 		cl::finish();
+
+		return true;
 	}
 
 	REGISTER_PLUGIN(GaussianBlur, GaussianBlur::Create);

@@ -13,9 +13,11 @@ namespace Op
 	class Operator
 	{
 	public:
+		std::shared_ptr<cl::Image> outputImage;
+
 		virtual bool Parse(int argc, char* argv[]) = 0;
 		virtual void PrintUsage() const = 0;
-		virtual void Execute(cl::Context &context, cl::CommandQueue& queue, cl::Image &src, cl::Image &dst) = 0;
+		virtual bool Execute(cl::Context &context, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image) = 0;
 	};
 
 	using OpCreator = std::function<std::shared_ptr<Operator>()>;

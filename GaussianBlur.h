@@ -17,7 +17,7 @@ namespace Op
 		float* Distribution(float sigma, int radius) const;
 		bool Parse(int argc, char* argv[]) override;
 		void PrintUsage() const override;
-		void Execute(cl::Context &context, cl::CommandQueue& queue, cl::Image &src, cl::Image &dst) override;
+		bool Execute(cl::Context &context, cl::CommandQueue& queue, const std::shared_ptr<cl::Image> image) override;
 		static std::shared_ptr<GaussianBlur> Create()
 		{
 			return std::make_shared<GaussianBlur>();
